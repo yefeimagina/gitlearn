@@ -1,0 +1,37 @@
+library(jsonlite)
+library(dplyr)
+
+vol = function(selectname,selectpro,selectmodelid)
+{
+pec =filter(volumedata,Province == selectpro  & RegisterYear != 2016 & ModelIdx %in% selectmodelid ) %>% 
+  group_by(.,City)  %>%  summarise(.,sales = sum(Amount))
+pec = filter(pec,City == selectname)$sales/sum(pec$sales)
+sales16 = filter(volumedata,Province == selectpro & RegisterYear == 2016 & ModelIdx %in% selectmodelid ) %>% 
+  group_by(.,RegisterMonth,ModelIdx) %>% summarise(.,sales = sum(Amount),num = n())
+sales16$RegisterYear = 2016
+sales16$sales = sales16$sales*pec 
+#length(sales16$ModelIdx[!duplicated(sales16$ModelIdx)])
+sales17 =  filter(volumedata,City == selectname & RegisterYear != 2016 & ModelIdx %in% selectmodelid ) %>% 
+  group_by(.,RegisterMonth,ModelIdx,RegisterYear) %>% summarise(.,sales = sum(Amount),num = n())
+sales = rbind(sales16,sales17)
+return(sales)
+}
+
+pri = function(modelid,selectpro,selectname)
+{
+l1 = filter(pricedata,ModelIdx %in% modelid & ori_province == selectpro  & ym %in% v$monthYear[seq(1,5)]) %>% group_by(.,ym,ModelIdx) %>% 
+  summarise(.,mean = mean(InvoicePrice),max = max(InvoicePrice),min = min(InvoicePrice),mMS = mean(MSRP),
+            maxMS = max(MSRP),minSR = min(MSRP),num = n())
+l2 =   filter(pricedata,ModelIdx %in% modelid & ori_city == selectname  ) %>% group_by(.,ym,ModelIdx) %>% 
+  summarise(.,mean = mean(InvoicePrice),max = max(InvoicePrice),min = min(InvoicePrice),mMS = mean(MSRP),
+            maxMS = max(MSRP),minSR = min(MSRP),num = n())
+
+t1 = rbind(l1,l2) %>% as.data.frame()
+t2 = v$monthYear %>% as.data.frame()
+names(t2) = "a"
+t2$a = as.character(t2$a)
+ans = left_join(t2,t1,by = c("a" = "ym"))
+return(ans)
+}
+
+
