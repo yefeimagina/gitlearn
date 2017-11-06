@@ -1,0 +1,121 @@
+cityname = c("北京","郑州","苏州","上海","杭州")
+provincename = c("北京","河南","江苏","上海","浙江")
+cityid = c(17,121,183,179,339)
+modelCN = c("现代ix35","现代途胜","现代胜达","现代索纳塔","现代名图")
+modelid = c(49,55,53,54,51)
+pricedata = read.csv("pr.csv",stringsAsFactors = F)
+volumedata = read.csv("vol.csv",stringsAsFactors = F)
+useyear = c("2016-8", "2016-9", "2016-10", "2016-11", "2016-12", 
+            "2017-1", "2017-2", "2017-3", "2017-4", "2017-5", "2017-6", "2017-7")
+#base data
+
+selectname = cityname[2]
+selectpro  = provincename[2]
+selectmodelid = modelid
+#select data
+
+v= list()
+v$monthYearThis =  "2017-07"
+v$monthYear =  c("2016-08", "2016-09", "2016-10", "2016-11", "2016-12", 
+                 "2017-01", "2017-02", "2017-03", "2017-04", "2017-05", "2017-06", "2017-07")
+v$modelInfo = list()
+v$modelInfo$detaildata = character(0)
+v$marketShareRegion = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1)
+v$inventoryDepth = c(0.7, 0.62, 0.86, 0.78, 0.88, 0.64, 0.75, 0.89, 0.83, 0.67, 0.82, 0.79)
+v$carParcRank = c(1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4)
+v$volumePerDealer = c(10, 20, 30, 40, 50, 60, 50, 40, 30, 20, 10, 20)
+
+
+
+
+sales = vol(selectname,selectpro,selectmodelid)
+sales$ym = paste0(sales$RegisterYear,"-",sales$RegisterMonth)
+v$detailVolume  = list()
+v$detailVolume$name = modelCN 
+for(i in 1:length(modelCN))
+{
+char = paste0("v$detailVolume$",modelCN[i],"=filter(sales,ModelIdx == ",
+            modelid[i]," & ym %in% useyear) %>%arrange(RegisterYear,RegisterMonth) %>% .$sales %>% round(.,0)")
+eval(parse(text=char))
+}
+
+v$volume = filter(sales,ym %in% useyear)  %>% arrange(RegisterYear,RegisterMonth) %>% 
+  group_by(.,RegisterYear,RegisterMonth) %>% summarise(.,sa = sum(sales)) %>% .$sa %>% round(.,0)
+vy = filter(sales,ym %in% c(useyear,"2016-7")) %>% arrange(RegisterYear,RegisterMonth) %>% 
+         group_by(.,RegisterYear,RegisterMonth) %>% summarise(.,sa = sum(sales)) %>% .$sa %>% round(.,0)
+vy1 = vector()
+ for(i in 2:length(vy))
+{
+ vy1[i-1] = (vy[i]-vy[i-1])/vy[i-1]
+}
+v$volumeMoM = vy1
+
+vcu2015 = filter(sales,RegisterYear == 2015) %>% arrange(sales,RegisterYear,RegisterMonth) %>% group_by(.,RegisterYear,RegisterMonth) %>% 
+  summarise(.,sa = sum(sales))  %>% .$sa 
+compare = c(vcu2015[seq(8,12)],vcu2016[seq(1,7)])%>% round(.,0)
+yoy = vector()
+for(i in 1:12)
+{
+  yoy[i] = (v$volume[i] - compare[i])/compare[i]
+}
+v$volumeYoY = yoy
+
+qvcu2015 = vector()
+qvcu2016 = vector()
+qvcu2017 = vector()
+for(i in 1:12)
+{
+  qvcu2015[i] = sum(vcu2015[seq(1,i)])
+}
+vcu2016 = filter(sales,RegisterYear == 2016) %>% arrange(sales,RegisterYear,RegisterMonth) %>% group_by(.,RegisterYear,RegisterMonth) %>% 
+  summarise(.,sa = sum(sales))  %>% .$sa 
+for(i in 1:12)
+{
+  qvcu2016[i] = sum(vcu2016[seq(1,i)])
+}    
+vcu2017 = filter(sales,RegisterYear == 2017) %>% arrange(sales,RegisterYear,RegisterMonth) %>% group_by(.,RegisterYear,RegisterMonth) %>% 
+  summarise(.,sa = sum(sales))  %>% .$sa 
+for(i in 1:9)
+{
+  qvcu2017[i] = sum(vcu2017[seq(1,i)])
+}      
+v$volumeCum = c(qvcu2016[seq(8,12)],qvcu2017[seq(1,7)]) %>% round(.,0)
+compare = c(qvcu2015[seq(8,12)],qvcu2016[seq(1,7)])%>% round(.,0)
+cy = vector()
+for(i in 1:12)
+{
+  cy[i] = (v$volumeCum[i] - compare[i])/compare[i]
+}
+v$volumeCumYoY = cy
+v$volumeThis = v$volume[12]
+v$volumeCumThis = v$volumeCum[12]
+
+
+pris = pri(modelid,selectpro,selectname)
+pric = group_by(pris,a) %>% summarise(.,sam = sum(num))
+v$priceSample = pric$sam
+v$minPrice  = group_by(pris,a) %>% summarise(.,mi = min(min)) %>% .$mi 
+v$maxPrice  = group_by(pris,a) %>% summarise(.,ma = max(max)) %>% .$ma
+v$meanPrice = group_by(pris,a) %>% summarise(.,me = mean(mean)) %>% .$me
+v$meanMSRP = group_by(pris,a) %>% summarise(.,m = mean(mMS)) %>% .$m
+v$minPriceThis = v$minPrice[12]
+v$maxPriceThis = v$maxPrice[12]
+v$meanPriceThis = v$meanPrice[12]
+v$meanMSRPThis = v$meanMSRP[12]
+v$meanDiscount = (v$meanMSRP - v$meanPrice)/v$meanMSRP
+v$meanDiscountThis = v$meanDiscount[12]
+v$detailPrice  = list()
+v$detailPrice$name = modelCN
+for(i in 1:length(modelCN))
+{
+  char = paste0("v$detailPrice$",modelCN[i],"=pri(",modelid[i]
+                ,",selectpro,selectname) %>% .$mean")
+  eval(parse(text=char))
+}
+
+
+an = list()
+an$v = v
+an = toJSON(an)
+cat(an,file = 'json.txt', fill = FALSE, labels = NULL, append = FALSE)
+
